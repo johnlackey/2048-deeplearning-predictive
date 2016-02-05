@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>2048</title>
+
+  <link href="style/main.css" rel="stylesheet" type="text/css">
+  <link rel="shortcut icon" href="favicon.ico">
+  <link rel="apple-touch-icon" href="meta/apple-touch-icon.png">
+  <link rel="apple-touch-startup-image" href="meta/apple-touch-startup-image-640x1096.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)"> <!-- iPhone 5+ -->
+  <link rel="apple-touch-startup-image" href="meta/apple-touch-startup-image-640x920.png"  media="(device-width: 320px) and (device-height: 480px) and (-webkit-device-pixel-ratio: 2)"> <!-- iPhone, retina -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, target-densitydpi=160dpi, initial-scale=1.0, maximum-scale=1, user-scalable=no, minimal-ui">
+</head>
+ <body onload="start();">
+  <div class="container">
+    <div class="heading">
+      <h1 class="title">2048</h1>
+      <div class="scores-container">
+        <div class="key-container">""</div>
+        <div class="score-container">0</div>
+        <div class="best-container">0</div>
+      </div>
+    </div>
+
+    <div class="above-game">
+      <p class="game-intro">Join the numbers and get to the <strong>2048 tile!</strong></p>
+      <a class="restart-button">New Game</a>
+    </div>
+
+    <div class="game-container">
+      <div class="game-message">
+        <p></p>
+        <div class="lower">
+	        <a class="keep-playing-button">Keep going</a>
+          <a class="retry-button">Try again</a>
+        </div>
+      </div>
+
+      <div class="grid-container">
+        <div class="grid-row">
+          <div class="grid-cell"></div>
+          <div class="grid-cell"></div>
+          <div class="grid-cell"></div>
+          <div class="grid-cell"></div>
+        </div>
+        <div class="grid-row">
+          <div class="grid-cell"></div>
+          <div class="grid-cell"></div>
+          <div class="grid-cell"></div>
+          <div class="grid-cell"></div>
+        </div>
+        <div class="grid-row">
+          <div class="grid-cell"></div>
+          <div class="grid-cell"></div>
+          <div class="grid-cell"></div>
+          <div class="grid-cell"></div>
+        </div>
+        <div class="grid-row">
+          <div class="grid-cell"></div>
+          <div class="grid-cell"></div>
+          <div class="grid-cell"></div>
+          <div class="grid-cell"></div>
+        </div>
+      </div>
+
+      <div class="tile-container">
+
+      </div>
+    </div>
+
+    <p class="game-explanation">
+      <strong class="important">How to play:</strong> Use your <strong>arrow keys</strong> to move the tiles. When two tiles with the same number touch, they <strong>merge into one!</strong>
+    </p>
+    <hr>
+    <p>
+    <strong class="important">Note:</strong> This site is the official version of 2048. You can play it on your phone via <a href="http://git.io/2048">http://git.io/2048.</a> All other apps or sites are derivatives or fakes, and should be used with caution.
+    </p>
+    <hr>
+    <p>
+    Created by <a href="http://gabrielecirulli.com" target="_blank">Gabriele Cirulli.</a> Based on <a href="https://itunes.apple.com/us/app/1024!/id823499224" target="_blank">1024 by Veewo Studio</a> and conceptually similar to <a href="http://asherv.com/threes/" target="_blank">Threes by Asher Vollmer.</a>
+    </p>
+  </div>
+   <textarea id="qspec" style="width:100%; height:200px;">
+var side_size = 4;
+var highest_value = 2048;
+var num_inputs = side_size * side_size * Math.log2(highest_value); // 9 eyes, each sees 3 numbers (wall, green, red thing proximity)
+var num_actions = 4; // 5 possible angles agent can turn
+var temporal_window = 1; // amount of temporal memory. 0 = agent lives in-the-moment :)
+var network_size = num_inputs*temporal_window + num_actions*temporal_window + num_inputs;
+
+// the value function network computes a value of taking any of the possible actions
+// given an input state. Here we specify one explicitly the hard way
+// but user could also equivalently instead use opt.hidden_layer_sizes = [20,20]
+// to just insert simple relu hidden layers.
+var layer_defs = [];
+layer_defs.push({type:'input', out_sx:1, out_sy:1, out_depth:network_size});
+layer_defs.push({type:'fc', num_neurons: 300, activation:'relu'});
+layer_defs.push({type:'fc', num_neurons: 300, activation:'relu'});
+layer_defs.push({type:'regression', num_neurons:num_actions});
+
+// options for the Temporal Difference learner that trains the above net
+// by backpropping the temporal difference learning rule.
+var tdtrainer_options = {learning_rate:0.001, momentum:0.0, batch_size:64, l2_decay:0.01};
+
+var opt = {};
+opt.temporal_window = temporal_window;
+opt.experience_size = 30000;
+opt.start_learn_threshold = 1000;
+opt.gamma = 0.7;
+opt.learning_steps_total = 200000;
+opt.learning_steps_burnin = 3000;
+opt.epsilon_min = 0.05;
+opt.epsilon_test_time = 0.05;
+opt.layer_defs = layer_defs;
+opt.tdtrainer_options = tdtrainer_options;
+
+var brain = new deepqlearn.Brain(num_inputs, num_actions, opt); // woohoo
+   </textarea>
+   <h1>State Visualizations</h1>
+   
+   <div><b>Left</b>: Current input state (quite a useless thing to look at). <b>Right</b>: Average reward over time (this should go up as agent becomes better on average at collecting rewards)</div>
+   <canvas id="vis_canvas" width="350" height="150"></canvas>
+   <canvas id="graph_canvas" width="350" height="150"></canvas><br>
+   <canvas id="net_canvas" width="2000" height="200"></canvas><br>
+   
+   <!--<canvas id="canvas" width="700" height="200"></canvas>-->
+   <div id="brain_info_div"><div><div>experience replay size: 4203<br>exploration epsilon: 0.9938883248730964<br>age: 4205<br>average Q-learning loss: 0.1062660890110729<br>smooth-ish reward: 0.7147144345566855<br></div></div></div>
+   
+   <h1>Controls</h1>
+   <button onclick="goveryfast()">Go very fast</button>
+   <button onclick="gofast()">Go fast</button>
+   <button onclick="gonormal()">Go normal speed</button>
+   <button onclick="goslow()">Go slow</button><br>
+   <button onclick="startlearn()">Start Learning</button>
+   <button onclick="stoplearn()">Stop Learning</button>
+   
+
+  <script src="js/bind_polyfill.js"></script>
+  <script src="js/classlist_polyfill.js"></script>
+  <script src="js/animframe_polyfill.js"></script>
+  <script src="js/keyboard_input_manager.js"></script>
+  <script src="js/html_actuator.js"></script>
+  <script src="js/grid.js"></script>
+  <script src="js/tile.js"></script>
+  <script src="js/local_storage_manager.js"></script>
+  <script src="js/game_manager.js"></script>
+  <script>
+    var keyboardInputManager = new KeyboardInputManager;
+  </script>
+  <script src="js/application.js"></script>
+  <script src="js/world.js"></script>
+  <script src="js/agent.js"></script>
+  <script src="js/convnet.js"></script>
+  <script src="js/deepqlearn.js"></script>
+  <script src="js/util.js"></script> 
+  <script src="js/vis.js"></script>
+  <script>
+    function draw_net() {
+      if(simspeed <=1) {
+        // we will always draw at these speeds
+      } else {
+        if(w.clock % 10 !== 0) return;  // do this sparingly 50
+      }
+      
+      var canvas = document.getElementById("net_canvas");
+      var ctx = canvas.getContext("2d");
+      var W = canvas.width;
+      var H = canvas.height;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      var L = w.agents[0].brain.value_net.layers;
+      var dx = (W - 50)/L.length;
+      var x = 10;
+      var y = 40;
+      ctx.font="12px Verdana";
+      ctx.fillStyle = "rgb(0,0,0)";
+      ctx.fillText("Value Function Approximating Neural Network:", 10, 14);
+      for(var k=0;k<L.length;k++) {
+        if(typeof(L[k].out_act)==='undefined') continue; // maybe not yet ready
+        var kw = L[k].out_act.w;
+        var n = kw.length;
+        var dy = (H-50)/n;
+        ctx.fillStyle = "rgb(0,0,0)";
+        ctx.fillText(L[k].layer_type + "(" + n + ")", x, 35);
+        for(var q=0;q<n;q++) {
+          var v = Math.floor(kw[q]*100);
+          if(v >= 0) ctx.fillStyle = "rgb(0,0," + v + ")";
+          if(v < 0) ctx.fillStyle = "rgb(" + (-v) + ",0,0)";
+          ctx.fillRect(x,y,10,10);
+          y += 12;
+          if(y>H-25) { y = 40; x += 12};
+        }
+        x += 50;
+        y = 40;
+      }
+    }
+    
+    var reward_graph = new cnnvis.Graph();
+    
+    function draw_stats() {
+      var canvas = document.getElementById("vis_canvas");
+      var ctx = canvas.getContext("2d");
+      var W = canvas.width;
+      var H = canvas.height;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      var a = w.agents[0];
+      var b = a.brain;
+      var netin = b.last_input_array;
+      ctx.strokeStyle = "rgb(0,0,0)";
+      //ctx.font="12px Verdana";
+      //ctx.fillText("Current state:",10,10);
+      ctx.lineWidth = 10;
+      ctx.beginPath();
+      for(var k=0,n=netin.length;k<n;k++) {
+        ctx.moveTo(10+k*12, 120);
+        ctx.lineTo(10+k*12, 120 - netin[k] * 100);
+      }
+      ctx.stroke();
+      
+      if(w.clock % 200 === 0) {
+        reward_graph.add(w.clock, b.average_reward_window.get_average());
+        var gcanvas = document.getElementById("graph_canvas");
+        reward_graph.drawSelf(gcanvas);
+      }
+    }
+    
+    // Tick the world
+    function tick() {
+      if (gameManager.isGameTerminated()) {
+        keyboardInputManager.emit('restart');
+      }
+      w.tick();
+      if(!skipdraw || w.clock % 1 === 0) {
+        //draw();
+        draw_stats();
+        draw_net();
+        w.agents[0].brain.visSelf(document.getElementById('brain_info_div'));
+      }
+    }
+    
+    var simspeed = 2;
+    function goveryfast() {
+      window.clearInterval(current_interval_id);
+      current_interval_id = setInterval(tick, 0);
+      skipdraw = true;
+      simspeed = 3;
+    }
+    function gofast() {
+      window.clearInterval(current_interval_id);
+      current_interval_id = setInterval(tick, 0);
+      skipdraw = false;
+      simspeed = 2;
+    }
+    function gonormal() {
+      window.clearInterval(current_interval_id);
+      current_interval_id = setInterval(tick, 30);
+      skipdraw = false;
+      simspeed = 1;
+    }
+    function goslow() {
+      window.clearInterval(current_interval_id);
+      current_interval_id = setInterval(tick, 200);
+      skipdraw = false;
+      simspeed = 0;
+    }
+    
+    function savenet() {
+      var j = w.agents[0].brain.value_net.toJSON();
+      var t = JSON.stringify(j);
+      document.getElementById('tt').value = t;
+    }
+    
+    function loadnet() {
+      var t = document.getElementById('tt').value;
+      var j = JSON.parse(t);
+      w.agents[0].brain.value_net.fromJSON(j);
+      stoplearn(); // also stop learning
+      gonormal();
+    }
+    
+    function startlearn() {
+      w.agents[0].brain.learning = true;
+    }
+    function stoplearn() {
+      w.agents[0].brain.learning = false;
+    }
+    
+    function reload() {
+      w.agents = [new Agent()]; // this should simply work. I think... ;\
+      reward_graph = new cnnvis.Graph(); // reinit
+    }
+    
+    function start() {
+      //canvas = document.getElementById("canvas");
+      //ctx = canvas.getContext("2d");
+      
+      w = new World();
+      w.agents = [new Agent()];
+        keyboardInputManager.emit('restart');
+      
+      gofast();
+      //tick();
+    }
+    var current_interval_id;
+  </script>
+</body>
+</html>
